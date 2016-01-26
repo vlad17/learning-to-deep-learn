@@ -196,10 +196,13 @@ def read_data_sets(train_dir, fake_data=False, one_hot=False, dtype=tf.float32):
   validation_labels = train_labels[:VALIDATION_SIZE]
   train_images = train_images[VALIDATION_SIZE:]
   train_labels = train_labels[VALIDATION_SIZE:]
+
   data_sets.train = DataSet(train_images, train_labels, dtype=dtype)
   data_sets.validation = DataSet(validation_images, validation_labels,
                                  dtype=dtype)
   data_sets.test = DataSet(test_images, test_labels, dtype=dtype)
+
+  print()
   cols = ['Data Set', 'x', 'y']
   justify = 25
   def printtbl(ls):
@@ -207,6 +210,8 @@ def read_data_sets(train_dir, fake_data=False, one_hot=False, dtype=tf.float32):
   printtbl(cols)
   for name, ds in vars(data_sets).items():
     printtbl([name, ds.images.shape, ds.labels.shape])
+  print()
+
   print('x {!s} y {!s}'.format(data_sets.train.images.dtype,
                                data_sets.train.labels.dtype))
   return data_sets
