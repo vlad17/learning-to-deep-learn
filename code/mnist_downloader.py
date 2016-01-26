@@ -31,8 +31,8 @@ import gzip
 import os
 import tensorflow.python.platform
 import numpy
+from itertools import *
 from six.moves import urllib
-from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
 
 SOURCE_URL = 'http://yann.lecun.com/exdb/mnist/'
@@ -184,13 +184,13 @@ def read_data_sets(train_dir, fake_data=False, one_hot=False, dtype=tf.float32):
   TEST_IMAGES = 't10k-images-idx3-ubyte.gz'
   TEST_LABELS = 't10k-labels-idx1-ubyte.gz'
   VALIDATION_SIZE = 5000
-  local_file = maybe_download(TRAIN_IMAGES, train_dir)
+  local_file = download_if_absent(TRAIN_IMAGES, train_dir)
   train_images = extract_images(local_file)
-  local_file = maybe_download(TRAIN_LABELS, train_dir)
+  local_file = download_if_absent(TRAIN_LABELS, train_dir)
   train_labels = extract_labels(local_file, one_hot=one_hot)
-  local_file = maybe_download(TEST_IMAGES, train_dir)
+  local_file = download_if_absent(TEST_IMAGES, train_dir)
   test_images = extract_images(local_file)
-  local_file = maybe_download(TEST_LABELS, train_dir)
+  local_file = download_if_absent(TEST_LABELS, train_dir)
   test_labels = extract_labels(local_file, one_hot=one_hot)
   validation_images = train_images[:VALIDATION_SIZE]
   validation_labels = train_labels[:VALIDATION_SIZE]
@@ -200,4 +200,14 @@ def read_data_sets(train_dir, fake_data=False, one_hot=False, dtype=tf.float32):
   data_sets.validation = DataSet(validation_images, validation_labels,
                                  dtype=dtype)
   data_sets.test = DataSet(test_images, test_labels, dtype=dtype)
+  cols = ['Data Set', 'x', 'y']
+  justify = 25
+  def printtbl(ls):
+    print(''.join(str(i).ljust(justify) for i in ls))
+  printtbl(cols)
+  for name, ds in vars(data_sets).items():
+    printtbl([name, ds.images.shape, ds.labels.shape])
+  print('x {!s} y {!s}'.format(data_sets.train.images.dtype,
+                               data_sets.train.labels.dtype))
   return data_sets
+          
