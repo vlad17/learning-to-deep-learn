@@ -1,7 +1,9 @@
 # TensorFlow-Learn
 Scratch repo for me to learn the TensorFlow API
 
-## future ideas
+## Overarching TODOs:
+
+Softmax with simulated annealing
 
 fast cross validation:
     # Invert the permutation
@@ -10,3 +12,6 @@ fast cross validation:
     perm = inv
     self._x = self._x[perm]
     self._y = self._y[perm]
+
+Conv net (try some asymmetry later)
+
