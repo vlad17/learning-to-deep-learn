@@ -25,8 +25,6 @@ Relative path to file from root, at commit
 tensorflow/examples/tutorials/mnist/input_data.py
 """
 
-# TODO fix the broken fake data API
-
 import gzip
 import os
 import tensorflow.python.platform
@@ -34,6 +32,7 @@ import numpy
 from itertools import *
 from six.moves import urllib
 import tensorflow as tf
+from data_set import DataSet
 
 SOURCE_URL = 'http://yann.lecun.com/exdb/mnist/'
 
@@ -76,7 +75,7 @@ def dense_to_one_hot(labels_dense, num_classes=10):
   """Convert class labels from scalars to one-hot vectors."""
   num_labels = labels_dense.shape[0]
   index_offset = numpy.arange(num_labels) * num_classes
-  labels_one_hot = numpy.zeros((num_labels, num_classes))
+  labels_one_hot = numpy.zeros((num_labels, num_classes), dtype=numpy.float32)
   labels_one_hot.flat[index_offset + labels_dense.ravel()] = 1
   return labels_one_hot
 
@@ -96,96 +95,36 @@ def extract_labels(filename, one_hot=False):
       return dense_to_one_hot(labels)
     return labels
 
-class DataSet(object):
-  def __init__(self, images, labels, fake_data=False, one_hot=False,
-               dtype=tf.float32):
-    """Construct a DataSet.
-    one_hot arg is used only if fake_data is true.  `dtype` can be either
-    `uint8` to leave the input as `[0, 255]`, or `float32` to rescale into
-    `[0, 1]`.
-    """
-    dtype = tf.as_dtype(dtype).base_dtype
-    if dtype not in (tf.uint8, tf.float32):
-      raise TypeError('Invalid image dtype %r, expected uint8 or float32' %
-                      dtype)
-    if fake_data:
-      self._num_examples = 10000
-      self.one_hot = one_hot
-    else:
-      assert images.shape[0] == labels.shape[0], (
-          'images.shape: %s labels.shape: %s' % (images.shape,
-                                                 labels.shape))
-      self._num_examples = images.shape[0]
-      # Convert shape from [num examples, rows, columns, depth]
-      # to [num examples, rows*columns] (assuming depth == 1)
-      assert images.shape[3] == 1
-      images = images.reshape(images.shape[0],
-                              images.shape[1] * images.shape[2])
-      if dtype == tf.float32:
-        # Convert from [0, 255] -> [0.0, 1.0].
-        images = images.astype(numpy.float32)
-        images = numpy.multiply(images, 1.0 / 255.0)
-    self._images = images
-    self._labels = labels
-    self._epochs_completed = 0
-    self._index_in_epoch = 0
-  def reset_epoch_count(self):
-    self._epochs_completed = 0
-  @property
-  def images(self):
-    return self._images
-  @property
-  def labels(self):
-    return self._labels
-  @property
-  def num_examples(self):
-    return self._num_examples
-  @property
-  def epochs_completed(self):
-    return self._epochs_completed
-  def next_batch(self, batch_size, fake_data=False):
-    """Return the next `batch_size` examples from this data set."""
-    if fake_data:
-      fake_image = [1] * 784
-      if self.one_hot:
-        fake_label = [1] + [0] * 9
-      else:
-        fake_label = 0
-      return [fake_image for _ in range(batch_size)], [
-          fake_label for _ in range(batch_size)]
-    start = self._index_in_epoch
-    self._index_in_epoch += batch_size
-    if self._index_in_epoch > self._num_examples:
-      # Finished epoch
-      self._epochs_completed += 1
-      # Shuffle the data
-      perm = numpy.arange(self._num_examples)
-      numpy.random.shuffle(perm)
-      self._images = self._images[perm]
-      self._labels = self._labels[perm]
-      # Start next epoch
-      start = 0
-      self._index_in_epoch = batch_size
-      assert batch_size <= self._num_examples
-    end = self._index_in_epoch
-    return self._images[start:end], self._labels[start:end]
+def rescale_and_retype(images, exact):
+  # Convert shape from [num examples, rows, columns, depth]
+  # to [num examples, rows*columns] (assuming depth == 1)
+  assert images.shape[3] == 1
+  images = images.reshape(images.shape[0],
+                          images.shape[1] * images.shape[2])
+  if not exact:
+    # Convert from [0, 255] -> [0.0, 1.0].
+    images = images.astype(numpy.float32)
+    images = numpy.multiply(images, 1.0 / 255.0)
 
-def read_data_sets(train_dir, fake_data=False, one_hot=False, dtype=tf.float32):
-  class DataSets(object):
-    pass
-  data_sets = DataSets()
-  if fake_data:
-    def fake():
-      return DataSet([], [], fake_data=True, one_hot=one_hot, dtype=dtype)
-    data_sets.train = fake()
-    data_sets.validation = fake()
-    data_sets.test = fake()
-    return data_sets
+  return images
+
+def read_data_sets(train_dir, one_hot=False, exact_inputs=False):
+  """If necessary, downloads MNIST data into train_dir. Using the downloaded
+  files in the given directory, extracts the MNIST data and returns a tuple of
+  (training images, training labels, testing images, testing labels),
+  where image arrays are 4D tensors and labels are 1D if dense encoding and
+  2D otherwise (one-hot encoding).
+
+  If exact_inputs is set to true, images are kept in uint8 data type form
+  for their pixel values [0, 256). Otherwise, they are 4-byte floats
+  scaled to 0 and 1.
+"""
+
   TRAIN_IMAGES = 'train-images-idx3-ubyte.gz'
   TRAIN_LABELS = 'train-labels-idx1-ubyte.gz'
   TEST_IMAGES = 't10k-images-idx3-ubyte.gz'
   TEST_LABELS = 't10k-labels-idx1-ubyte.gz'
-  VALIDATION_SIZE = 5000
+
   local_file = download_if_absent(TRAIN_IMAGES, train_dir)
   train_images = extract_images(local_file)
   local_file = download_if_absent(TRAIN_LABELS, train_dir)
@@ -194,27 +133,11 @@ def read_data_sets(train_dir, fake_data=False, one_hot=False, dtype=tf.float32):
   test_images = extract_images(local_file)
   local_file = download_if_absent(TEST_LABELS, train_dir)
   test_labels = extract_labels(local_file, one_hot=one_hot)
-  validation_images = train_images[:VALIDATION_SIZE]
-  validation_labels = train_labels[:VALIDATION_SIZE]
-  train_images = train_images[VALIDATION_SIZE:]
-  train_labels = train_labels[VALIDATION_SIZE:]
 
-  data_sets.train = DataSet(train_images, train_labels, dtype=dtype)
-  data_sets.validation = DataSet(validation_images, validation_labels,
-                                 dtype=dtype)
-  data_sets.test = DataSet(test_images, test_labels, dtype=dtype)
+  train_images = rescale_and_retype(train_images, exact_inputs)
+  test_images = rescale_and_retype(test_images, exact_inputs)
 
-  print()
-  cols = ['Data Set', 'x', 'y']
-  justify = 25
-  def printtbl(ls):
-    print(''.join(str(i).ljust(justify) for i in ls))
-  printtbl(cols)
-  for name, ds in vars(data_sets).items():
-    printtbl([name, ds.images.shape, ds.labels.shape])
-  print()
+  return (DataSet(train_images, train_labels),
+          DataSet(test_images, test_labels))
 
-  print('x {!s} y {!s}'.format(data_sets.train.images.dtype,
-                               data_sets.train.labels.dtype))
-  return data_sets
           
