@@ -129,6 +129,8 @@ class DataSet(object):
     self._labels = labels
     self._epochs_completed = 0
     self._index_in_epoch = 0
+  def reset_epoch_count(self):
+    self._epochs_completed = 0
   @property
   def images(self):
     return self._images
