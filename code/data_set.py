@@ -15,6 +15,7 @@ class DataSet(object):
     self._y = y
     self._epoch_lock = False
     self._validation_lock = False
+    self._validation_range = (0, 0)
   @property
   def x(self):
     return self._x
@@ -39,11 +40,14 @@ class DataSet(object):
 
     # Validation is stored from [-self._validation_size, -1]
     for i in range(0, rounded_size, vsize):
-        train = list(chain(range(0, i), range(i + vsize, self._size)))
-        validate = range(i, i + vsize)
-        assert not self._epoch_lock
-        yield (DataSet(self._x[train], self._y[train]),
-               DataSet(self._x[validate], self._y[validate]))
+        self._validation_range = (i, i + vsize)
+        # TODO return views, not slices
+        vx = self._x[self._validation_range[0]:self._validation_range[1]]
+        vy = self._y[self._validation_range[0]:self._validation_range[1]]
+        yield DataSet(vx, vy)
+
+    self._validation_range = (0, 0)
+    self._validation_lock == False
     
   def new_epoch(self, batch_size):
     """Creates a generator of batches for a new epoch"""
@@ -51,18 +55,20 @@ class DataSet(object):
     assert batch_size > 0
     # TODO is there a non-reentrant decorator? One that handles breaks
     self._epoch_lock = True
-    
-    perm = np.arange(self._size)
-    np.random.shuffle(perm)
-    self._x = self._x[perm]
-    self._y = self._y[perm]
+
+    lo, hi = self._validation_range
+    validation_size = hi - lo
+    train_size = self._size - validation_size
 
     # TODO does this make copies or a slice?
-    rounded_size = self._size - self._size % batch_size
-    for i in range(0, rounded_size, batch_size):
-        j = i + batch_size
-        assert not self._validation_lock
-        yield self._x[i:j], self._y[i:j]
+    for i in range(train_size // batch_size):
+        assert (lo, hi) == self._validation_range
+        batch = np.random.randint(train_size, size=batch_size)
+        # TODO vectorize this addition
+        for j in range(batch_size):
+            if lo <= batch[j]: batch[j] += validation_size
+        # TODO return a view again
+        yield self._x[batch], self._y[batch]
     
     self._epoch_lock = False
 
