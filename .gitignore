@@ -24,7 +24,8 @@ var/
 .installed.cfg
 *.egg
 
-data
+data/*
+!data/README.md
 *~
 
 # PyInstaller
