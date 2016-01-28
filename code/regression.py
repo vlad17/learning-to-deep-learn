@@ -22,6 +22,11 @@ class SoftMax(object):
     (a, c) should be the dimensions of the vectorized 2D tensor y with
     which the cross entropy of the output is calculated.
 
+    Either of x or y may have its first dimensions set to None (which allows
+    for a runtime-selected batch size). However, if using this option, user
+    must enforce consistency between input batch sizes and their associated
+    label batch size.
+
     If the cross entropy is not required, y may be an integer indicating
     how many classes the softmax should predict.
 
