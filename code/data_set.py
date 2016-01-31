@@ -62,9 +62,7 @@ class DataSet(object):
         for i in range(train_size // batch_size):
             assert (lo, hi) == self._validation_range
             batch = np.random.randint(train_size, size=batch_size)
-            # TODO vectorize this addition
-            for j in range(batch_size):
-                if lo <= batch[j]: batch[j] += validation_size
+            batch += (lo <= batch) * validation_size
             # TODO return a view again
             yield self._x[batch], self._y[batch]
     finally:
