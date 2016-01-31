@@ -4,6 +4,7 @@ Lightweight container class for supervised learning.
 
 import numpy as np
 from itertools import *
+import tensorflow as tf
 
 class DataSet(object):
   def __init__(self, x, y):
@@ -51,29 +52,41 @@ class DataSet(object):
     assert not self._epoch_lock
     assert batch_size > 0
     try:
-        self._epoch_lock = True
+      self._epoch_lock = True
 
-        lo, hi = self._validation_range
-        validation_size = hi - lo
-        train_size = self._size - validation_size
+      lo, hi = self._validation_range
+      validation_size = hi - lo
+      train_size = self._size - validation_size
 
-        # It's possible to make a zero-copy epoch
-        # if we do a Knuth shuffle on the epoch with a permutation
-        # that keeps the validation range invariant.
-        #
-        # One needs to un-shuffle before the next fold, though.
-        #
-        # This would create draws from the training set WITHOUT
-        # replacement.
-        #
-        # However, a batch-sized copy is probably not worth the trouble.
-        for i in range(train_size // batch_size):
-            assert (lo, hi) == self._validation_range
-            batch = np.random.randint(train_size, size=batch_size)
-            batch += (lo <= batch) * validation_size
-            yield self._x[batch], self._y[batch]
+      # It's possible to make a zero-copy epoch
+      # if we do a Knuth shuffle on the epoch with a permutation
+      # that keeps the validation range invariant.
+      #
+      # One needs to un-shuffle before the next fold, though.
+      #
+      # This would create draws from the training set WITHOUT
+      # replacement.
+      #
+      # However, a batch-sized copy is probably not worth the trouble.
+      for i in range(train_size // batch_size):
+        assert (lo, hi) == self._validation_range
+        batch = np.random.randint(train_size, size=batch_size)
+        batch += (lo <= batch) * validation_size
+        yield self._x[batch], self._y[batch]
     finally:
-        self._epoch_lock = False
+      self._epoch_lock = False
 
+  def multiclass_error(self, x, predicted_y, actual_y, session=None):
+    """Returns the average error for the entire data set for predicting
+    a mulit-class label (compares most likely classes only). Feeds
+    a dictionary to TensorFlow session with this dataset's inputs as
+    'x' and outputs as 'actual_y'."""
+    is_correct = tf.equal(tf.argmax(predicted_y, 1), tf.argmax(actual_y, 1))
+    accuracy = tf.reduce_mean(tf.cast(is_correct, "float"))
+    feed_dict = {x:self._x, actual_y:self._y}
+    return 1 - accuracy.eval(feed_dict=feed_dict, session=session)
+
+
+    
 
 
