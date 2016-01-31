@@ -29,9 +29,7 @@ class DataSet(object):
 
   def cross_validation(self, nfolds):
     """Creates a generator with validation folds compatible with
-    new_epoch, which only returns batches from non-validation examples.
-    if nfolds is None or 0, then LOOCV is used."""
-    if not nfolds: nfolds = self._size
+    new_epoch, which only returns batches from non-validation examples."""
     assert not self._validation_lock
     assert nfolds > 0
     assert nfolds <= self._size    
