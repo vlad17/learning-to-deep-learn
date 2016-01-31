@@ -57,7 +57,7 @@ class DataSet(object):
         validation_size = hi - lo
         train_size = self._size - validation_size
 
-        # TODO - it's possible to make a zero-copy epoch
+        # It's possible to make a zero-copy epoch
         # if we do a Knuth shuffle on the epoch with a permutation
         # that keeps the validation range invariant.
         #
@@ -65,6 +65,8 @@ class DataSet(object):
         #
         # This would create draws from the training set WITHOUT
         # replacement.
+        #
+        # However, a batch-sized copy is probably not worth the trouble.
         for i in range(train_size // batch_size):
             assert (lo, hi) == self._validation_range
             batch = np.random.randint(train_size, size=batch_size)
