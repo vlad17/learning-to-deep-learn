@@ -39,7 +39,6 @@ class DataSet(object):
       # Validation is stored from [-self._validation_size, -1]
       for i in range(0, rounded_size, vsize):
         self._validation_range = (i, i + vsize)
-        # TODO return views, not slices
         vx = self._x[self._validation_range[0]:self._validation_range[1]]
         vy = self._y[self._validation_range[0]:self._validation_range[1]]
         yield DataSet(vx, vy)
@@ -58,12 +57,18 @@ class DataSet(object):
         validation_size = hi - lo
         train_size = self._size - validation_size
 
-        # TODO does this make copies or a slice?
+        # TODO - it's possible to make a zero-copy epoch
+        # if we do a Knuth shuffle on the epoch with a permutation
+        # that keeps the validation range invariant.
+        #
+        # One needs to un-shuffle before the next fold, though.
+        #
+        # This would create draws from the training set WITHOUT
+        # replacement.
         for i in range(train_size // batch_size):
             assert (lo, hi) == self._validation_range
             batch = np.random.randint(train_size, size=batch_size)
             batch += (lo <= batch) * validation_size
-            # TODO return a view again
             yield self._x[batch], self._y[batch]
     finally:
         self._epoch_lock = False
