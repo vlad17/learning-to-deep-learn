@@ -10,8 +10,6 @@ Repo for me to learn the TensorFlow API. Contains some useful abstracted TensorF
 
 ## Overarching TODOs:
 
-Softmax with simulated annealing
-
 fast cross validation:
 
 ```
@@ -24,6 +22,4 @@ fast cross validation:
     self._x = self._x[perm]
     self._y = self._y[perm]
 ```
-
-Conv net (try some asymmetry later)
 
