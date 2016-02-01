@@ -15,6 +15,8 @@ Softmax with simulated annealing
 fast cross validation:
 
 ```
+    # Validation is stored from [-self._validation_size, -1]
+
     # Invert the permutation
     inv = np.zeros(self._size)
     for i, x in enumerate(perm): inv[x] = i

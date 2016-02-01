@@ -37,7 +37,6 @@ class DataSet(object):
       self._validation_lock = True
       vsize = self._size // nfolds
       rounded_size = self._size - self._size % vsize
-      # Validation is stored from [-self._validation_size, -1]
       for i in range(0, rounded_size, vsize):
         self._validation_range = (i, i + vsize)
         vx = self._x[self._validation_range[0]:self._validation_range[1]]
