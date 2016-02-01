@@ -75,14 +75,16 @@ class DataSet(object):
     finally:
       self._epoch_lock = False
 
-  def multiclass_error(self, x, predicted_y, actual_y, session=None):
+  def multiclass_error(self, x, predicted_y, actual_y,
+                       feed_dict={}, session=None):
     """Returns the average error for the entire data set for predicting
     a mulit-class label (compares most likely classes only). Feeds
     a dictionary to TensorFlow session with this dataset's inputs as
     'x' and outputs as 'actual_y'."""
     is_correct = tf.equal(tf.argmax(predicted_y, 1), tf.argmax(actual_y, 1))
     accuracy = tf.reduce_mean(tf.cast(is_correct, "float"))
-    feed_dict = {x:self._x, actual_y:self._y}
+    feed_dict[x] = self._x
+    feed_dict[actual_y] = self._y
     return 1 - accuracy.eval(feed_dict=feed_dict, session=session)
 
 

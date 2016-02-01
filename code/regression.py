@@ -30,7 +30,8 @@ class SoftMax(object):
     If the cross entropy is not required, y may be an integer indicating
     how many classes the softmax should predict.
 
-    Uses random N(0, 1) initialization for weights and bias. Note that this
+    Uses random [-1, 1]-truncated N(0, 0.1) initialization for weights and
+    constant 0.1 for bias. Note that this
     introduces some variables, which must be initialized."""
     assert len(x.get_shape()) == 2
     classes = 0
@@ -44,8 +45,10 @@ class SoftMax(object):
       def eq_or_none(a, b): return not a or not b or a == b
       assert eq_or_none(y.get_shape()[0].value, x.get_shape()[0].value)
     assert classes > 1
-    W = tf.Variable(tf.random_normal([x.get_shape()[1].value, classes]))
-    b = tf.Variable(tf.random_normal([classes]))
+    # TODO pull out to a generalized initial value argument
+    W = tf.Variable(tf.truncated_normal([x.get_shape()[1].value, classes],
+                                        stddev=0.1))
+    b = tf.Variable(tf.constant(0.1, shape=[classes]))
     self._logit = tf.matmul(x, W) + b
   @cached_property
   def y(self): return tf.nn.softmax(self._logit)
