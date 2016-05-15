@@ -23,3 +23,4 @@ fast cross validation:
     self._y = self._y[perm]
 ```
 
+[![Binder](http://mybinder.org/badge.svg)](http://mybinder.org/repo/vlad17/TensorFlow-Learn)
