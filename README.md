@@ -12,4 +12,11 @@ Repo for me to learn the TensorFlow API. Contains some useful abstracted TensorF
 
 `tensorflow numpy tabulate six`
 
+## Trained network
+
+Contact vlad17 for the pretrained network files, which may be placed in `data/` for a ready network.
+
+## Binder
+
 [![Binder](http://mybinder.org/badge.svg)](http://mybinder.org/repo/vlad17/TensorFlow-Learn)
+
