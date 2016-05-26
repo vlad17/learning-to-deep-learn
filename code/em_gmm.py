@@ -1,21 +1,17 @@
 import tensorflow as tf
 import numpy as np
-import pandas as pd
-from itertools import *
 import sklearn
-import math
 import random
 import sys
-import multiprocessing
-import scipy
-from joblib import Parallel, delayed
-import threading
-nproc = max(1, multiprocessing.cpu_count() - 1)
 
-import warnings
-warnings.filterwarnings('ignore')
+# Algorithm copied pretty much directly from sklearn
+# TODO: make sklearn-like interface with extra MLE method.
+# (To make MLE faster, make an aggr TF method that computes them in
+# parallel - outside this file, using a queuerunner).
 
-# Copied pretty much directly from sklearn
+#class TFGMM(sklearn.base.BaseEstimator):
+# TODO use the parameter dtype.
+# TODO with tf.Graph().as_default() statements.
 
 # Returns a TensorFlow scalar with the size of the i-th dimension for
 # the parameter tensor x.
@@ -35,7 +31,7 @@ def tf_log_normals(X, mus, sigmas):
     # p(X) = sqrt(a * b * c)
     # a = (2 pi)^(-p)
     # b = det(sigma)^(-1)
-    # c = exp(-(x - mu)^T sigma^(-1) (x - mu)) [expanded for numerical stability]
+    # c = exp(-(x - mu)^T sigma^(-1) (x - mu)), expanded for numerical stability
     #
     # Below we make simplifications since sigma is diag
     

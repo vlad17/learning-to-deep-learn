@@ -11,7 +11,9 @@ Repo for me to learn the TensorFlow API. Contains some useful abstracted TensorF
 
 ## Dependencies
 
-`tensorflow numpy tabulate six`
+`tensorflow numpy tabulate six sklearn matplotlib`
+
+Relies on python3. Tested on 3.3+.
 
 ## Prepared data
 
