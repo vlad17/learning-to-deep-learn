@@ -38,8 +38,11 @@ def tf_log_normals(X, mus, sigmas):
     D = tf_ncols(mus)
     XT = tf.transpose(X) # pxN
     invsig = tf.inv(sigmas)
+
+    dtype = XT.dtype
     
-    loga = -tf.cast(D, 'float64') * tf.log(tf.constant(2 * np.pi, dtype='float64')) # scalar
+    loga = -tf.cast(D, dtype) \
+           * tf.log(tf.constant(2 * np.pi, dtype)) # scalar
     logb = tf.reduce_sum(tf.log(invsig), 1, keep_dims=True) # Kx1
     logc =  \
         - tf.reduce_sum(invsig * tf.square(mus), 1, keep_dims=True) \
@@ -104,7 +107,7 @@ def fit_em(X, initial_mus, max_steps, tol, min_covar=MIN_COVAR_DEFAULT, verbose=
     with tf.Graph().as_default():
         X = tf.constant(X)
         
-        mus, sigmas, alphas = (tf.Variable(x, dtype='float64')
+        mus, sigmas, alphas = (tf.Variable(x, dtype=X.dtype)
                                for x in [mus0, sigmas0, alphas0])
         
         all_ll, resp = estep(X, mus, sigmas, alphas)
@@ -144,7 +147,8 @@ def marginal_posterior(xs, mus, sigmas, alphas):
     O = xs.shape[1]
     D = mus.shape[1]
     with tf.Graph().as_default():
-        observed_mus, observed_sigmas = (tf.constant(a, dtype='float64')
+        dtype = tf.as_dtype(xs.dtype)
+        observed_mus, observed_sigmas = (tf.constant(a, dtype=dtype)
                                          for a in (mus[:,0:O], sigmas[:, 0:O]))
         ll = tf_log_likelihood(xs, observed_mus, observed_sigmas, alphas) # KxN
         norm = tf_log_sum_exp(ll) # 1xN
@@ -187,11 +191,12 @@ def gd_mle(mus, sigmas, alphas, nsteps, tol,
             decay_fraction, decay_period = 0.95, steps_per_decay
             global_step = tf.Variable(0, trainable=False, name='global_step')
             if np.isnan(step) or minstep > step: step = minstep
-            
+
+            dtype = mu.dtype
             learning_rate = tf.train.exponential_decay(
                 step, global_step, decay_period, decay_fraction, staircase=True)
-            learning_rate = tf.cast(learning_rate, 'float64')
-            x = tf.Variable(mu.reshape(1, -1), dtype='float64', name='x')
+            learning_rate = tf.cast(learning_rate, dtype)
+            x = tf.Variable(mu.reshape(1, -1), dtype=dtype, name='x')
             nlog_likelihood = -estep(x, mus, sigmas, alphas)[0]
             nlog_likelihood = tf.squeeze(nlog_likelihood)
             train_step = DoubleGDOptimizer(learning_rate).minimize(
