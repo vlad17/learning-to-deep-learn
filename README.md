@@ -7,6 +7,7 @@ Repo for me to learn the TensorFlow API. Contains some useful abstracted TensorF
 ## Ready-made classes
 
 * Softmax-based regression
+* TODO migrate TF GMM from final-proj-cos424 to here with nicer interface.
 
 ## Dependencies
 
