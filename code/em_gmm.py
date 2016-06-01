@@ -478,3 +478,46 @@ class TFGMM(sklearn.base.BaseEstimator):
         """
         return - 2 * self.score(X).sum() + 2 * self._n_parameters()
 
+    # TODO: adapt gmm.ipynb notebook to use above methods.
+    # TODO: implement below methods
+    # TODO: adapt gmm.ipynb notebook to use below methods.
+
+    def mle():
+        """Returns an approximation to the MLE of the GMM - in reality,
+        this returns the expectation of the most likely cluster.
+
+        This is usually very similar to the MLE because of the Gaussian's
+        exponential dropoff in even moderately high-dimensional spaces.
+
+        Returns
+        -------
+        mle: An array of dimension n_dimensions which would be the models
+        approximate guess for the most likely estimate of the value.
+        """
+
+    def marginalize(observed, observed_ix):
+        """Performs a posterior marginalization on the GMM model, assuming
+        that some dimensions, indexed by the second argument, are observed
+        with values according to the first argument.
+    
+        The marginalization yield another TFGMM.
+
+        Parameters
+        ----------
+        observed : Array of observed values
+          Array must have dimensionality less than n_features.
+
+        observed_ix : Array of indices of dimensions for observed values.
+          Array must be of equal length compared to the observed array, with
+          the i-th element of observed_ix[i] corresponding to that dimension
+          being observed[observed_ix[i]] in the posterior marginalization.
+        
+          This array must have all unique indices between [0, n_features)
+
+        Returns
+        -------
+        A TFGMM of reduced dimensionality, with n_features - len(observed)
+        dimensions re-indexed from 0, according to the posterior marginalization
+        induced by the arguments
+        """
+        
