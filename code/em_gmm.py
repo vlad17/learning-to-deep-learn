@@ -5,13 +5,6 @@ import random
 import sys
 
 # Algorithm copied pretty much directly from sklearn
-# TODO: make sklearn-like interface with extra MLE method.
-# (To make MLE faster, make an aggr TF method that computes them in
-# parallel - outside this file, using a queuerunner).
-
-#class TFGMM(sklearn.base.BaseEstimator):
-# TODO use the parameter dtype.
-# TODO with tf.Graph().as_default() statements.
 
 # Returns a TensorFlow scalar with the size of the i-th dimension for
 # the parameter tensor x.
@@ -168,3 +161,7 @@ def argmax_exp(mus, sigmas, alphas):
 # which, for high dimensions, occurs very quickly. As such, it does not make
 # sense to have a complicated, slow algorithm when the most-likely cluster
 # mean is an estimat that's just as good.
+
+# TODO
+#class TFGMM(sklearn.base.BaseEstimator):
+
