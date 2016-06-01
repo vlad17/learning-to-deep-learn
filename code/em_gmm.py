@@ -161,67 +161,10 @@ def argmax_exp(mus, sigmas, alphas):
     i = np.argmax(alphas)
     return mus[i]
 
-
-# http://stackoverflow.com/questions/33702251/tensorflow-loss-minimization-type-error
-class DoubleGDOptimizer(tf.train.GradientDescentOptimizer):
-    def _valid_dtypes(self):
-        return set([tf.float32, tf.float64])
-
-# Given a GMM defined by KxD mus, KxD sigmas, and K alphas, returns the MLE
-# estimate by using gradient descent starting from each mu in mus
-def gd_mle(mus, sigmas, alphas, nsteps, tol,
-           warning=None, verbose=False, minstep=1e-3):
-    # Use GD from each of the means with a step size less than the min distance between those means
-    # step size is min(mean diff) * min(mean likelihoods) / sum(adj likelihoods)
-    mudist = sklearn.metrics.pairwise.pairwise_distances(mus, metric='l2')
-    alphasM = np.tile(alphas, (len(alphas), 1)).transpose()
-    alpha_sum = np.array([[i+j for j in alphas] for i in alphas])
-    steps_per_decay = max(nsteps // 100, 1)
-    step_size = mudist * alphasM / alpha_sum / max(steps_per_decay, 2)
-    np.fill_diagonal(step_size, np.inf)
-    step_size = step_size.min(axis=1)
-    best_ll = np.inf, None
-    
-    at_least_one_conv_early = False
-    
-    for i, (mu, step) in enumerate(zip(mus, step_size)):
-        if verbose: print('Running mean', i)
-
-        with tf.Graph().as_default():
-            decay_fraction, decay_period = 0.95, steps_per_decay
-            global_step = tf.Variable(0, trainable=False, name='global_step')
-            if np.isnan(step) or minstep > step: step = minstep
-
-            dtype = mu.dtype
-            learning_rate = tf.train.exponential_decay(
-                step, global_step, decay_period, decay_fraction, staircase=True)
-            learning_rate = tf.cast(learning_rate, dtype)
-            x = tf.Variable(mu.reshape(1, -1), dtype=dtype, name='x')
-            nlog_likelihood = -estep(x, mus, sigmas, alphas)[0]
-            nlog_likelihood = tf.squeeze(nlog_likelihood)
-            train_step = DoubleGDOptimizer(learning_rate).minimize(
-                nlog_likelihood, global_step=global_step, var_list=[x])
-            
-            with tf.Session() as session:
-                prev_ll = np.inf
-                ll = prev_ll
-                session.run(tf.initialize_all_variables())
-                for i in range(1, 1 + nsteps):
-                    session.run(train_step)
-                    ll = session.run(nlog_likelihood)
-                    if verbose and i % max(nsteps // 10, 1) == 0:
-                        print('  ', i, 'of', nsteps, 'done, NLL =', ll)
-                        if abs(ll - prev_ll) < tol:
-                            if verbose:
-                                print('  Converged early after {} steps.'
-                                      .format(i))
-                            break
-                prev_ll = ll
-                if verbose: print('  Best NLL =', ll)
-                at_least_one_conv_early |= i < 1 + nsteps
-                best_ll = min(best_ll, (ll, session.run(x)))
-            
-    if not at_least_one_conv_early and warning:
-        print('Warning, none converged early:', warning)
-        
-    return best_ll[1].reshape(-1) if best_ll[1] is not None else None
+# The originating notebook, from final-proj-cos-424, had a method for
+# gradient descent on the negative log likelihood of the posterior GMM model.
+# However, the absolute MLE is very close to one of the normal's expectations,
+# because of the exponential decay of the normal pdf past the inflection point,
+# which, for high dimensions, occurs very quickly. As such, it does not make
+# sense to have a complicated, slow algorithm when the most-likely cluster
+# mean is an estimat that's just as good.
