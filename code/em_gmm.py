@@ -96,6 +96,7 @@ def fit_em(X, initial_mus, max_steps, tol, min_covar=MIN_COVAR_DEFAULT, verbose=
     mus0 = initial_mus
     sigmas0 = np.tile(np.var(X, axis=0), (K, 1))
     alphas0 = np.ones(K) / K
+    converged = False
 
     with tf.Graph().as_default():
         X = tf.constant(X)
@@ -119,11 +120,12 @@ def fit_em(X, initial_mus, max_steps, tol, min_covar=MIN_COVAR_DEFAULT, verbose=
                 sess.run((update_mus_step, update_sigmas_step, update_alphas_step))
                 if verbose: print('EM iteration', i, 'log likelihood', ll)
                 if abs(ll - prev_ll) < tol:
+                    converged = True
                     break
                 prev_ll = ll
             m, s, a = sess.run((mus, sigmas, alphas))
     
-    return ll, m, s, a
+    return ll, m, s, a, converged
 
 # Given a set of partial observations xs each of dimension O < D for a fitted GMM model with 
 # K cluster priors alpha, KxD means mus, and KxD diagonal covariances sigmas,
@@ -162,5 +164,317 @@ def argmax_exp(mus, sigmas, alphas):
 # sense to have a complicated, slow algorithm when the most-likely cluster
 # mean is an estimat that's just as good.
 
-# TODO
-#class TFGMM(sklearn.base.BaseEstimator):
+class TFGMM(sklearn.base.BaseEstimator):
+    """Gaussian Mixture Model implemented on top of TensorFlow.
+
+    Only a diagonal model is representable.
+
+    Representation of a Gaussian mixture model probability distribution.
+    This class allows for easy evaluation of, sampling from, and
+    maximum-likelihood estimation of the parameters of a GMM distribution.
+
+    Initializes parameters such that every mixture component has zero
+    mean and identity covariance.
+
+    Parameters
+    ----------
+    n_components : int, optional
+        Number of mixture components. Defaults to 1.
+
+    random_state: RandomState or an int seed (None by default)
+        A random number generator instance
+
+    min_covar : float, optional
+        Floor on the diagonal of the covariance matrix to prevent
+        overfitting.  Defaults to 1e-3.
+
+    tol : float, optional
+        Convergence threshold. EM iterations will stop when average
+        gain in log-likelihood is below this threshold.  Defaults to 1e-3.
+
+    n_iter : int, optional
+        Number of EM iterations to perform.
+
+    n_init : int, optional
+        Number of initializations to perform. the best results is kept
+
+    verbose : boolean, optional (default false)
+        Enable verbose output. 
+
+    Attributes
+    ----------
+    weights_ : array, shape (`n_components`,)
+        This attribute stores the mixing weights for each mixture component.
+
+    means_ : array, shape (`n_components`, `n_features`)
+        Mean parameters for each mixture component.
+
+    covars_ : array
+        Covariance parameters for each mixture component.
+        the shape is (n_components, n_features), corresponding to the
+        covariance matrix diagonal of each component in the diagonal
+        GMM.
+
+    converged_ : bool
+        True when convergence was reached in fit(), False otherwise.
+    """
+
+    def __init__(self, n_components=1, covariance_type='diag',
+                 random_state=None, tol=1e-3, min_covar=1e-3,
+                 n_iter=100, n_init=1, verbose=0):
+        self.n_components = n_components
+        self.covariance_type = covariance_type
+        self.tol = tol
+        self.min_covar = min_covar
+        self.random_state = random_state
+        self.n_iter = n_iter
+        self.n_init = n_init
+        self.params = params
+        self.init_params = init_params
+        self.verbose = verbose
+
+        if n_init < 1:
+            raise ValueError('GMM estimation requires at least one run')
+
+        self.means_ = None
+
+        # flag to indicate exit status of fit() method: converged (True) or
+        # n_iter reached (False)
+        self.converged_ = False
+
+    def check_fitted(self):
+        if self.means_ is None:
+            raise Exception('GMM must be fitted')
+
+    def score_samples(self, X):
+        """Return the per-sample likelihood of the data under the model.
+
+        Compute the log probability of X under the model and
+        return the posterior distribution (responsibilities) of each
+        mixture component for each element of X.
+
+        Parameters
+        ----------
+        X: array_like, shape (n_samples, n_features)
+            List of n_features-dimensional data points. Each row
+            corresponds to a single data point.
+
+        Returns
+        -------
+        logprob : array_like, shape (n_samples,)
+            Log probabilities of each data point in X.
+
+        responsibilities : array_like, shape (n_samples, n_components)
+            Posterior probabilities of each mixture component for each
+            observation
+        """
+        self.check_fitted()
+
+        X = sklearn.utils.check_array(X)
+        if X.size == 0:
+            return np.array([]), np.empty((0, self.n_components))
+        if X.ndim != 2:
+            raise ValueError('X is not a 2-tensor (X.shape = {})'
+                             .format(X.shape))
+        if X.shape[1] != self.means_.shape[1]:
+            raise ValueError('The shape of X  is not compatible with self')
+
+        return estep(X, self.means_, self.covars_, self.weights_)
+
+    def score(self, X, y=None):
+        """Compute the log probability under the model.
+
+        Parameters
+        ----------
+        X : array_like, shape (n_samples, n_features)
+            List of n_features-dimensional data points.  Each row
+            corresponds to a single data point.
+
+        Returns
+        -------
+        logprob : array_like, shape (n_samples,)
+            Log probabilities of each data point in X
+        """
+        logprob, _ = self.score_samples(X)
+        return logprob
+
+    def predict(self, X):
+        """Predict label for data.
+
+        Parameters
+        ----------
+        X : array-like, shape = [n_samples, n_features]
+
+        Returns
+        -------
+        C : array, shape = (n_samples,) component memberships
+        """
+        logprob, responsibilities = self.score_samples(X)
+        return responsibilities.argmax(axis=1)
+
+    def predict_proba(self, X):
+        """Predict posterior probability of data under each Gaussian
+        in the model.
+
+        Parameters
+        ----------
+        X : array-like, shape = [n_samples, n_features]
+
+        Returns
+        -------
+        responsibilities : array-like, shape = (n_samples, n_components)
+            Returns the probability of the sample for each Gaussian
+            (state) in the model.
+        """
+        logprob, responsibilities = self.score_samples(X)
+        return responsibilities
+
+    def fit_predict(self, X, y=None):
+        """Fit and then predict labels for data.
+
+        Warning: due to the final maximization step in the EM algorithm,
+        with low iterations the prediction may not be 100% accurate
+
+        Parameters
+        ----------
+        X : array-like, shape = [n_samples, n_features]
+
+        Returns
+        -------
+        C : array, shape = (n_samples,) component memberships
+        """
+        return self._fit(X, y).argmax(axis=1)
+
+    def _fit(self, X, y=None, do_prediction=False):
+        """Estimate model parameters with the EM algorithm.
+
+        A initialization step is performed before entering the
+        expectation-maximization (EM) algorithm. If you want to avoid
+        this step, set the keyword argument init_params to the empty
+        string '' when creating the GMM object. Likewise, if you would
+        like just to do an initialization, set n_iter=0.
+
+        Parameters
+        ----------
+        X : array_like, shape (n, n_features)
+            List of n_features-dimensional data points.  Each row
+            corresponds to a single data point.
+
+        Returns
+        -------
+        responsibilities : array, shape (n_samples, n_components)
+            Posterior probabilities of each mixture component for each
+            observation.
+        """
+
+        # initialization step
+        X = check_array(X, dtype=np.float64, ensure_min_samples=2,
+                        estimator=self)
+        if X.shape[0] < self.n_components:
+            raise ValueError(
+                'GMM estimation with {} components, but got only {} samples'
+                .format(self.n_components, X.shape[0]))
+
+        max_log_prob = -np.infty
+
+        if self.verbose:
+            print('Expectation-maximization algorithm started.')
+
+        for init in range(self.n_init):
+            if self.verbose:
+                print('Initialization ' + str(init + 1))
+                start_init_time = time()
+
+            self.means_ = cluster.KMeans(
+                n_clusters=self.n_components,
+                random_state=self.random_state).fit(X).cluster_centers_
+            if self.verbose:
+                print('\tMeans have been initialized.')
+
+            ll, m, c, a, conv = fit_em(
+                 X, self.means_, self.n_iter, self.tol,
+                 min_covar=self.min_covar, verbose=self.verbose)
+            
+            if self.verbose and self.converged_:
+                print('\t\tEM algorithm converged.')
+
+            if ll > max_log_prob:
+                max_log_prob = ll
+                self.means_, self.covars_, self.weights, self.converged_ = (
+                    m, c, a, conv)
+                
+                if self.verbose:
+                    print('\tBetter parameters were found.')
+
+            if self.verbose:
+                print('\tInitialization ' + str(init + 1)
+                      + ' took {0:.5f}s'.format(time() - start_init_time))
+
+        # check the existence of an init param that was not subject to
+        # likelihood computation issue.
+        if np.isneginf(max_log_prob) and self.n_iter:
+            raise RuntimeError(
+                "EM algorithm was never able to compute a valid likelihood " +
+                "given initial parameters. Try different init parameters " +
+                "(or increasing n_init) or check for degenerate data.")
+
+        return self.predict_proba(X)
+
+    def fit(self, X, y=None):
+        """Estimate model parameters with the EM algorithm.
+
+        A initialization step is performed before entering the
+        expectation-maximization (EM) algorithm. If you want to avoid
+        this step, set the keyword argument init_params to the empty
+        string '' when creating the GMM object. Likewise, if you would
+        like just to do an initialization, set n_iter=0.
+
+        Parameters
+        ----------
+        X : array_like, shape (n, n_features)
+            List of n_features-dimensional data points.  Each row
+            corresponds to a single data point.
+
+        Returns
+        -------
+        self
+        """
+        self._fit(X, y)
+        return self
+
+    def _n_parameters(self):
+        """Return the number of free parameters in the model."""
+        ndim = self.means_.shape[1]
+        cov_params = self.n_components * ndim
+        mean_params = ndim * self.n_components
+        return int(cov_params + mean_params + self.n_components - 1)
+
+    def bic(self, X):
+        """Bayesian information criterion for the current model fit
+        and the proposed data
+
+        Parameters
+        ----------
+        X : array of shape(n_samples, n_dimensions)
+
+        Returns
+        -------
+        bic: float (the lower the better)
+        """
+        return (-2 * self.score(X).sum() +
+                self._n_parameters() * np.log(X.shape[0]))
+
+    def aic(self, X):
+        """Akaike information criterion for the current model fit
+        and the proposed data
+
+        Parameters
+        ----------
+        X : array of shape(n_samples, n_dimensions)
+
+        Returns
+        -------
+        aic: float (the lower the better)
+        """
+        return - 2 * self.score(X).sum() + 2 * self._n_parameters()
+
