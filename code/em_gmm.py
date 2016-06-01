@@ -130,9 +130,9 @@ def fit_em(X, initial_mus, max_steps, tol, min_covar=MIN_COVAR_DEFAULT, verbose=
 # returns the weighted sum of normals for the remaining D - O dimensions.
 #
 # Returns posterior_mus, posterior_sigmas, posterior_prior,
-# of dimensions:
-# Kx(D-O), Kx(D-O), NxK, respectively (each mu, sigma is the same for all posteriors).
-# NxK, NxKxD, NxKxD, respectively, for each x in xs, total of N.
+# of dimensions: Kx(D-O), Kx(D-O) for the posterior means and standard
+# deviations and NxK for each x in xs representing the updated cluster
+# weights conditioned on the partial observations given by xs.
 def marginal_posterior(xs, mus, sigmas, alphas):
     # https://gbhqed.wordpress.com/2010/02/21/conditional-and-marginal-distributions-of-a-multivariate-gaussian/
     # diagonal case is easy:
@@ -164,4 +164,3 @@ def argmax_exp(mus, sigmas, alphas):
 
 # TODO
 #class TFGMM(sklearn.base.BaseEstimator):
-
