@@ -25,9 +25,9 @@ Though not required, you may unzip `data.tgz` to recover the pre-trained CNN use
 
 ## TODOs
 
-  1. Child TFGMM from marginalize() should contain a mapping of child features.
-  2. Vectorize TFGMM.marginalize() for a series of observations of the same indices.
-  3. At creation time for TFGMM save dtype, then convert all data input arrays to that type.
-  4. Refactor helper functions in em_gmm.py to have leading underscore.
-  5. Run pylint on repo (maybe set up a pre-commit hook?)
+  * Vectorize TFGMM.marginalize() for a series of observations of the same indices.
+  * At creation time for TFGMM save dtype, then convert all data input arrays to that type.
+  * Refactor helper functions in em_gmm.py to have leading underscore.
+  * Run pylint on repo (maybe set up a pre-commit hook?)
+  * Highlight in `gmm.ipynb` where the argmax prediction is unstable.
   

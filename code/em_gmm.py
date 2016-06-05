@@ -522,8 +522,12 @@ class TFGMM (sklearn.base.BaseEstimator):
         -------
         A TFGMM of reduced dimensionality, with n_features - len(observed)
         dimensions re-indexed from 0, according to the posterior marginalization
-        induced by the arguments. The new features are kept in the same order of
-        dimension index.
+        induced by the arguments.
+
+        The returned TFGMM instance also contains a 'feature_ix_'
+        attribute, which is a numpy array of indices such that feature i
+        in the returned new TFGMM corresponds to the unobserved feature
+        feature_ix_[i] of the oroginal TFGMM.
         """
         self.check_fitted()
         
@@ -574,5 +578,6 @@ class TFGMM (sklearn.base.BaseEstimator):
         child.means_ = updated_mus
         child.covars_ = updated_sigmas
         child.weights_ = np.exp(updated_logalphas.reshape(-1))
+        child.feature_ix_ = unobserved_ix
 
         return child        
