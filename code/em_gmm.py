@@ -1,8 +1,11 @@
 import tensorflow as tf
 import numpy as np
 import sklearn
+from sklearn import cluster
 import random
 import sys
+import copy
+from time import time
 
 # Algorithm copied pretty much directly from sklearn
 
@@ -131,7 +134,7 @@ def fit_em(X, initial_mus, max_steps, tol, min_covar=MIN_COVAR_DEFAULT, verbose=
 # K cluster priors alpha, KxD means mus, and KxD diagonal covariances sigmas,
 # returns the weighted sum of normals for the remaining D - O dimensions.
 #
-# Returns posterior_mus, posterior_sigmas, posterior_prior,
+# Returns (posterior means, posterior covariance matrix diagonals, log posterior prior)
 # of dimensions: Kx(D-O), Kx(D-O) for the posterior means and standard
 # deviations and NxK for each x in xs representing the updated cluster
 # weights conditioned on the partial observations given by xs.
@@ -156,6 +159,9 @@ def argmax_exp(mus, sigmas, alphas):
     i = np.argmax(alphas)
     return mus[i]
 
+# URL for originating project from above:
+# https://github.com/PrincetonUniversity/final-proj-cos-424
+#
 # The originating notebook, from final-proj-cos-424, had a method for
 # gradient descent on the negative log likelihood of the posterior GMM model.
 # However, the absolute MLE is very close to one of the normal's expectations,
@@ -164,7 +170,7 @@ def argmax_exp(mus, sigmas, alphas):
 # sense to have a complicated, slow algorithm when the most-likely cluster
 # mean is an estimat that's just as good.
 
-class TFGMM(sklearn.base.BaseEstimator):
+class TFGMM (sklearn.base.BaseEstimator):
     """Gaussian Mixture Model implemented on top of TensorFlow.
 
     Only a diagonal model is representable.
@@ -221,16 +227,14 @@ class TFGMM(sklearn.base.BaseEstimator):
 
     def __init__(self, n_components=1, covariance_type='diag',
                  random_state=None, tol=1e-3, min_covar=1e-3,
-                 n_iter=100, n_init=1, verbose=0):
+                 n_iter=100, n_init=1, verbose=False):
         self.n_components = n_components
         self.covariance_type = covariance_type
         self.tol = tol
         self.min_covar = min_covar
-        self.random_state = random_state
+        self.random_state = sklearn.utils.check_random_state(random_state)
         self.n_iter = n_iter
         self.n_init = n_init
-        self.params = params
-        self.init_params = init_params
         self.verbose = verbose
 
         if n_init < 1:
@@ -272,14 +276,17 @@ class TFGMM(sklearn.base.BaseEstimator):
 
         X = sklearn.utils.check_array(X)
         if X.size == 0:
-            return np.array([]), np.empty((0, self.n_components))
+            return np.array([]), np.empty((0, self.n_components)) # todo dtype conversion
         if X.ndim != 2:
             raise ValueError('X is not a 2-tensor (X.shape = {})'
                              .format(X.shape))
         if X.shape[1] != self.means_.shape[1]:
             raise ValueError('The shape of X  is not compatible with self')
 
-        return estep(X, self.means_, self.covars_, self.weights_)
+        with tf.Session() as sess:
+            logprob, resp = sess.run(estep(X, self.means_, self.covars_, self.weights_))
+
+        return logprob.reshape(-1), resp.T
 
     def score(self, X, y=None):
         """Compute the log probability under the model.
@@ -367,13 +374,7 @@ class TFGMM(sklearn.base.BaseEstimator):
             observation.
         """
 
-        # initialization step
-        X = check_array(X, dtype=np.float64, ensure_min_samples=2,
-                        estimator=self)
-        if X.shape[0] < self.n_components:
-            raise ValueError(
-                'GMM estimation with {} components, but got only {} samples'
-                .format(self.n_components, X.shape[0]))
+        X = sklearn.utils.check_array(X, ensure_min_samples=self.n_components)
 
         max_log_prob = -np.infty
 
@@ -388,6 +389,8 @@ class TFGMM(sklearn.base.BaseEstimator):
             self.means_ = cluster.KMeans(
                 n_clusters=self.n_components,
                 random_state=self.random_state).fit(X).cluster_centers_
+            self.means_ = self.means_.astype(X.dtype)
+
             if self.verbose:
                 print('\tMeans have been initialized.')
 
@@ -400,7 +403,7 @@ class TFGMM(sklearn.base.BaseEstimator):
 
             if ll > max_log_prob:
                 max_log_prob = ll
-                self.means_, self.covars_, self.weights, self.converged_ = (
+                self.means_, self.covars_, self.weights_, self.converged_ = (
                     m, c, a, conv)
                 
                 if self.verbose:
@@ -444,6 +447,7 @@ class TFGMM(sklearn.base.BaseEstimator):
 
     def _n_parameters(self):
         """Return the number of free parameters in the model."""
+        self.check_fitted()
         ndim = self.means_.shape[1]
         cov_params = self.n_components * ndim
         mean_params = ndim * self.n_components
@@ -481,8 +485,9 @@ class TFGMM(sklearn.base.BaseEstimator):
     # TODO: adapt gmm.ipynb notebook to use above methods.
     # TODO: implement below methods
     # TODO: adapt gmm.ipynb notebook to use below methods.
+    # TODO: Make better parameter checks for other methods.
 
-    def mle():
+    def mle(self):
         """Returns an approximation to the MLE of the GMM - in reality,
         this returns the expectation of the most likely cluster.
 
@@ -494,8 +499,10 @@ class TFGMM(sklearn.base.BaseEstimator):
         mle: An array of dimension n_dimensions which would be the models
         approximate guess for the most likely estimate of the value.
         """
+        self.check_fitted()
+        return argmax_exp(self.means_, self.covars_, self.weights_)
 
-    def marginalize(observed, observed_ix):
+    def marginalize(self, observed, observed_ix):
         """Performs a posterior marginalization on the GMM model, assuming
         that some dimensions, indexed by the second argument, are observed
         with values according to the first argument.
@@ -504,10 +511,10 @@ class TFGMM(sklearn.base.BaseEstimator):
 
         Parameters
         ----------
-        observed : Array of observed values
-          Array must have dimensionality less than n_features.
+        observed : array_like of observed values
+          Array must be 1D and have length in [0, n_features)
 
-        observed_ix : Array of indices of dimensions for observed values.
+        observed_ix : array_like of indices of dimensions for observed values.
           Array must be of equal length compared to the observed array, with
           the i-th element of observed_ix[i] corresponding to that dimension
           being observed[observed_ix[i]] in the posterior marginalization.
@@ -518,6 +525,61 @@ class TFGMM(sklearn.base.BaseEstimator):
         -------
         A TFGMM of reduced dimensionality, with n_features - len(observed)
         dimensions re-indexed from 0, according to the posterior marginalization
-        induced by the arguments
+        induced by the arguments. The new features are kept in the same order of
+        dimension index.
         """
+        self.check_fitted()
         
+        observed = np.asarray(observed)
+        observed_ix = np.asarray(observed_ix)
+
+        if not np.issubdtype(observed.dtype, np.float):
+            raise ValueError('Observed values must be floating point')
+        if not np.issubdtype(observed_ix.dtype, np.integer):
+            raise ValueError('Indices in observed_ix must be integral')
+        
+        if observed.size == 0: return self
+        
+        if observed.ndim > 1:
+            raise ValueError('observed must be a vector, has rank {}'
+                             .format(observed.ndim))
+        if observed_ix.ndim > 1:
+            raise ValueError('observed_ix must be a vector, has rank {}'
+                             .format(observed.ndim))
+
+
+        if len(observed) != len(observed_ix):
+            raise ValueError('observed length {} != observed_ix length {}'
+                             .format(len(observed), len(observed_ix)))
+
+        ndim = self.means_.shape[1]
+        if len(observed) >= ndim:
+            raise ValueError('observed has length {}, more than dimension {}'
+                             .format(len(observed), ndim))
+        if np.any((observed_ix < 0) | (observed_ix >= ndim)):
+            raise ValueError('observed_ix values must be in range [0, D)'
+                             + ' where D is TFGMM dimension')
+        if len(np.unique(observed_ix)) != len(observed_ix):
+            raise ValueError('observed_ix must contain distinct values')
+
+        unobserved = np.ones(ndim)
+        unobserved[observed_ix] = 0
+        unobserved_ix = np.where(unobserved)[0]
+
+        perm = np.hstack((observed_ix, unobserved_ix))
+        updated_mus, updated_sigmas, updated_logalphas = marginal_posterior(
+            observed.reshape(1, -1),
+            self.means_[:, perm],
+            self.covars_[:, perm],
+            self.weights_)
+
+        child = copy.copy(self)
+        child.means_ = updated_mus
+        child.covars_ = updated_sigmas
+        child.weights_ = np.exp(updated_logalphas.reshape(-1))
+
+        return child        
+
+#todo child should have unobserved_ix mapping available.
+#todo vectorized marginalize()
+#todo just save dtype on fit, convert everything.
