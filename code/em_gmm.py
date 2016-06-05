@@ -1,3 +1,7 @@
+'''
+Implementation of a numerically-stable EM algorithm for GMM fitting,
+heavily influenced by scikit-learn's GMM implementation.
+'''
 import tensorflow as tf
 import numpy as np
 import sklearn
@@ -6,8 +10,6 @@ import random
 import sys
 import copy
 from time import time
-
-# Algorithm copied pretty much directly from sklearn
 
 # Returns a TensorFlow scalar with the size of the i-th dimension for
 # the parameter tensor x.
@@ -276,7 +278,7 @@ class TFGMM (sklearn.base.BaseEstimator):
 
         X = sklearn.utils.check_array(X)
         if X.size == 0:
-            return np.array([]), np.empty((0, self.n_components)) # todo dtype conversion
+            return np.array([]), np.empty((0, self.n_components))
         if X.ndim != 2:
             raise ValueError('X is not a 2-tensor (X.shape = {})'
                              .format(X.shape))
@@ -482,11 +484,6 @@ class TFGMM (sklearn.base.BaseEstimator):
         """
         return - 2 * self.score(X).sum() + 2 * self._n_parameters()
 
-    # TODO: adapt gmm.ipynb notebook to use above methods.
-    # TODO: implement below methods
-    # TODO: adapt gmm.ipynb notebook to use below methods.
-    # TODO: Make better parameter checks for other methods.
-
     def mle(self):
         """Returns an approximation to the MLE of the GMM - in reality,
         this returns the expectation of the most likely cluster.
@@ -579,7 +576,3 @@ class TFGMM (sklearn.base.BaseEstimator):
         child.weights_ = np.exp(updated_logalphas.reshape(-1))
 
         return child        
-
-#todo child should have unobserved_ix mapping available.
-#todo vectorized marginalize()
-#todo just save dtype on fit, convert everything.
