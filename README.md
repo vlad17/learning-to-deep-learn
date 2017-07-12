@@ -4,4 +4,6 @@ A collection of notebooks following recommended examples from my [blog post](htt
 
 ## Dependencies
 
-Assumes [Anaconda 3.6+](https://www.continuum.io/downloads) is installed.
+Dependencies that need to be manually installed: Python 3.6+, TensorFlow.
+
+Lightweight deps: `pip install numpy scipy tabulate six matplotlib sklearn jupyter tensorlayer`
