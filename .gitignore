@@ -24,6 +24,8 @@ var/
 .installed.cfg
 *.egg
 
+models/*
+
 data/*
 !data/README.md
 *~
