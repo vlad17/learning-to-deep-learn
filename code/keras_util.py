@@ -4,6 +4,10 @@ from keras.layers import Reshape
 import numpy as np
 import tensorflow as tf
 
+import sys
+import time
+from contextlib import contextmanager
+
 def refresh(seed=1234):
     """Kills the current keras session, restarts seeds. Assumes TF backend."""
     if K.backend() != 'tensorflow':
@@ -26,3 +30,12 @@ class EarlyStopLambda(keras.callbacks.Callback):
         if self.should_stop(current):
             self.model.stop_training = True
                 
+
+@contextmanager
+def rectime(name='', fmt='{: 4.0f}'):
+    print(name, end='')
+    sys.stdout.flush()
+    t = time.time()
+    yield
+    t = time.time() - t
+    print(fmt.format(t), 'sec')
