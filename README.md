@@ -6,7 +6,7 @@ A collection of notebooks following recommended examples from my [blog post](htt
 
 Dependencies that need to be manually installed: Python 3.6+, TensorFlow.
 
-Lightweight deps: `pip install numpy scipy tabulate six matplotlib sklearn jupyter keras`
+Lightweight deps: `pip install numpy scipy tabulate six matplotlib sklearn jupyter keras ray contexttimer`
 
 ## Current Working Directory
 
