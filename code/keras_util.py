@@ -86,3 +86,8 @@ def ray_gpu_session():
         with sess.as_default():
             K.set_session(sess)
             yield
+
+
+def evaluate(model, *args, **kwargs):
+    eval_list = model.evaluate(*args, **kwargs)
+    return dict(zip(model.metrics_names, eval_list))
