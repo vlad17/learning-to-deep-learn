@@ -25,13 +25,13 @@ def seedall(seed=1234):
 
 
 class EarlyStopLambda(keras.callbacks.Callback):
-    def __init__(self, metric='loss', should_stop=None):
+    def __init__(self, monitor='loss', should_stop=None):
         super(EarlyStopLambda, self).__init__()
-        self.metric = metric
+        self.monitor = monitor
         self.should_stop = should_stop
 
     def on_epoch_end(self, epoch, logs={}):
-        current = logs.get(self.metric)
+        current = logs.get(self.monitor)
         if self.should_stop(current):
             self.model.stop_training = True
 
@@ -64,8 +64,10 @@ def cd(new_dir):
     prev_dir = os.getcwd()
     os.makedirs(new_dir, exist_ok=True)
     os.chdir(new_dir)
-    yield
-    os.chdir(prev_dir)
+    try:
+        yield
+    finally:
+        os.chdir(prev_dir)
 
 
 def save_object(obj, filename):
@@ -90,4 +92,13 @@ def ray_gpu_session():
 
 def evaluate(model, *args, **kwargs):
     eval_list = model.evaluate(*args, **kwargs)
+    if not isinstance(eval_list, list):
+        eval_list = [eval_list]
+    return dict(zip(model.metrics_names, eval_list))
+
+
+def evaluate_generator(model, *args, **kwargs):
+    eval_list = model.evaluate_generator(*args, **kwargs)
+    if not isinstance(eval_list, list):
+        eval_list = [eval_list]
     return dict(zip(model.metrics_names, eval_list))
