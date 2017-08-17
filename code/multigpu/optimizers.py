@@ -1,4 +1,7 @@
 '''
+TODO: currently, these all suck (they make everything slower).
+
+Figure out why.
 '''
 from __future__ import print_function
 import sys
@@ -8,12 +11,7 @@ from keras.optimizers import (
     clip_norm, Optimizer,
     Adagrad, Adadelta, Adam, Adamax, Nadam, RMSprop, SGD)
 
-from keras_exp._mixin_common import mixedomatic
-
-_DEBUG = False
-if _DEBUG:
-    # import traceback
-    pass
+from ._mixin_common import mixedomatic
 
 if K.backend() == 'tensorflow':
     import tensorflow as tf
@@ -66,6 +64,7 @@ class OptimizerMultiGPUMixin(object):
     this mixin.
     '''
     # :param baseopt: A base class keras optimizer such as SGD, RMSprop,...
+
     def __init__(self, gdev_list=None, usenccl=True):
         '''
         :param list gdev_list: List of gpu devices i.e.
@@ -176,10 +175,6 @@ class OptimizerMultiGPUMixin(object):
         idev = self._device  # READ STATE: DEVICE
         grads = [tg[0] for tg in tower_gradvars[idev]]
 
-        if _DEBUG:
-            # traceback.print_stack()  # DEBUG
-            print('\nOptimizerMultiGPUMixin grads: {}'.format(grads))  # DEBUG
-
         return grads
 
     def get_updates(self, params, constraints, loss):
@@ -219,8 +214,6 @@ class OptimizerMultiGPUMixin(object):
 
         self._device = 0  # SET STATE: DEVICE
         self.updates = updates
-        # if _DEBUG:
-        #     print 'UPDATES:', _updates  # DEBUG
 
         return self.updates
 
@@ -274,4 +267,3 @@ class RMSPropMGPU(OptimizerMultiGPUMixin, RMSprop):
 @mixedomatic(ignore_kargs_spec=True)
 class SGD_MGPU(OptimizerMultiGPUMixin, SGD):
     pass
-
